@@ -1,0 +1,20 @@
+NAME = main # filename of the file containing main
+CC = gcc # C compiler
+CFLAGS = -Wall -Werror -Wextra -Wunreachable-code # Compiler flags we want to use
+DEPENDS = dep.o # dependency name (object files only)
+DEPEND_HEADER_FILES = dep.h # header files for dependency building
+OUTPUT_FILE = a.out # Filename of the final, compiled executable
+
+default: $(NAME)
+
+$(NAME): $(NAME).o $(DEPENDS)
+	  $(CC) $(CFLAGS) $(NAME).o $(DEPENDS) -o $(OUTPUT_FILE)
+
+$(NAME).o: $(NAME).c $(DEPEND_HEADER_FILES) 
+	  $(CC) -c $(NAME).c
+
+dep.o: dep.h dep.c
+	  $(CC) $(CFLAGS) -c dep.c
+
+run: $(NAME)
+	  ./$(OUTPUT_FILE)

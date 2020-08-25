@@ -8,10 +8,11 @@ typedef struct mstate {
     unsigned int mem[LMC_MEMORY_SIZE];
     unsigned int program_counter;
     unsigned int accumulator;
+    bool is_neg;
 } lmc_state;
 
 typedef enum op {
-    HLT, ADD, SUB, STA, LDA, BRA, BRZ, BRP, INP, OUT
+    HLT, ADD, SUB, STA, LDA, BRA, BRZ, BRP, INP, OUT, DAT
 } Opcode;
 
 extern const char* opcodes[];

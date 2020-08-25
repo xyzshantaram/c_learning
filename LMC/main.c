@@ -39,7 +39,8 @@ int main (int argc, char* argv[]) {
         lmc_state state = {
             .mem = {9000},
             .program_counter = 0,
-            .accumulator = 0
+            .accumulator = 0,
+            .is_neg = false
         };
 
         Instruction* instructions = malloc(count * sizeof(Instruction));
@@ -53,27 +54,30 @@ int main (int argc, char* argv[]) {
         printf("\n========= LOADING =========");
         for (size_t x = 0; x < count; x++) {
             instructions[x] = parse_input(file_lines[x]);
-            state.mem[x] = (instructions[x].op * 1000) + instructions[x].val;
+            
+            if (instructions[x].op == 10) state.mem[x] = instructions[x].val;
+            else state.mem[x] = (instructions[x].op * 1000) + instructions[x].val;
+
             printf("\nstored %i in address %i", state.mem[x], x);
         }
-        printf("\n====== LOADED, BEGIN ======\n");
+        printf("\n\n====== LOADED, BEGIN ======\n");
 
         // ================================= LMC execution  =================================
 
         do {
             int current_mem_cell = state.mem[state.program_counter];
-            Opcode inst = 0;
-            if (current_mem_cell > 999) {
-                inst = first_number(current_mem_cell);
-            }
-            
-            int val = current_mem_cell - (inst * 1000);
-            (*functions[inst])(&state, val);
+            Opcode inst = instructions[state.program_counter].op;
 
-            if (inst == HLT) {
-                break;
+            if (inst <= OUT) {
+                int val = current_mem_cell - (inst * 1000);
+                (*functions[inst])(&state, val);
             }
-            state.program_counter++;
+            else {
+            }
+
+            if (inst == HLT) break;
+            if (!(inst == BRA || inst == BRZ || inst == BRP)) state.program_counter++;
+
         } while(state.program_counter != LMC_MEMORY_SIZE - 1);
 
 

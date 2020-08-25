@@ -5,32 +5,47 @@
 #include "string_utils.h"
 
 const char* opcodes[] = {
-    "HLT", "ADD", "SUB", "STA", "LDA", "BRA", "BRZ", "BRP", "INP", "OUT"
+    "HLT", "ADD", "SUB", "STA", "LDA", "BRA", "BRZ", "BRP", "INP", "OUT", "DAT"
 };
 
-const int opcode_count = 10;
+const int opcode_count = 11;
 
 Instruction parse_input(char* str) {
 
-    Instruction i;
+    Instruction i = {
+        .op = 0,
+        .val = 0
+    };
     int pos = -1;
     if ((pos = str_array_fuzzy_contains(opcodes, opcode_count, str)) != -1) {
         size_t index = 0;
         char** instr = split_on_delim(str, &index, ' ');
-        i.op = pos;
-        i.val = atoi(instr[1]);
+        if (instr) {
+            i.op = pos;
+            i.val = atoi(instr[1]);
+        }
+        free (instr);
     }
     return i;
 }
 
 void add(lmc_state* state, byte address) {
     byte address_bounded = address % LMC_MEMORY_SIZE;
+    if (state->is_neg) {
+        if ((state->accumulator*-1) + state->mem[address_bounded] >= 0) {
+            state->is_neg = false;
+        }
+    }
     state->accumulator += state->mem[address_bounded];
 }
 
 void sub(lmc_state* state, byte address) {
     byte address_bounded = address % LMC_MEMORY_SIZE;
     state->accumulator -= state->mem[address_bounded];
+    if (state->accumulator < 0) {
+        state->accumulator *= -1;
+        state->is_neg = true;
+    }
 }
 
 void sta(lmc_state* state, byte address) {
@@ -55,13 +70,14 @@ void brz(lmc_state* state, byte address) {
 
 void brp(lmc_state* state, byte address) {
     byte address_bounded = address % LMC_MEMORY_SIZE;
-    if (state->accumulator > 0) state->program_counter = state->mem[address_bounded];
+    if (!state->is_neg) state->program_counter = state->mem[address_bounded];
 }
 
 void inp(lmc_state* state, byte address) {
     printf("\nINP> ");
     char* str = read_string('\n');
     state->accumulator = atoi(str);
+    state->is_neg = false;
     printf("Accumulator set to: %i", state->accumulator);
 }
 
@@ -70,7 +86,7 @@ void out(lmc_state* state, byte address) {
 }
 
 void hlt(lmc_state* state, byte address) {
-    printf("\n======== HLT AT %zu ========\n", state->program_counter);
+    printf("\n\n======== HLT AT %zu ========\n", state->program_counter);
 }
 
 lmc_functions functions[] = {

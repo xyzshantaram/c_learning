@@ -5,8 +5,9 @@
 #include "string_utils.h"
 
 const char* opcodes[] = {
-    "ADD", "SUB", "STA", "LDA", "BRA", "BRZ", "BRP", "INP", "OUT", "HLT"
+    "HLT", "ADD", "SUB", "STA", "LDA", "BRA", "BRZ", "BRP", "INP", "OUT"
 };
+
 const int opcode_count = 10;
 
 Instruction parse_input(char* str) {
@@ -68,8 +69,12 @@ void out(lmc_state* state, byte address) {
     printf("\nOUT: %i", state->accumulator);
 }
 
+void hlt(lmc_state* state, byte address) {
+    printf("\n======== HLT AT %zu ========\n", state->program_counter);
+}
+
 lmc_functions functions[] = {
-    &add, &sub, &sta, &lda, &bra, &brz, &brp, &inp, &out
+    &hlt, &add, &sub, &sta, &lda, &bra, &brz, &brp, &inp, &out
 };
 
 Opcode opcode_from_string(char* str) {

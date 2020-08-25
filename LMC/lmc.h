@@ -11,8 +11,11 @@ typedef struct mstate {
 } lmc_state;
 
 typedef enum op {
-    ADD, SUB, STA, LDA, BRA, BRZ, BRP, INP, OUT, HLT
+    HLT, ADD, SUB, STA, LDA, BRA, BRZ, BRP, INP, OUT
 } Opcode;
+
+extern const char* opcodes[];
+extern const int opcode_count;
 
 typedef struct instruction {
     int val;

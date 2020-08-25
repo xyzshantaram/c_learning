@@ -13,16 +13,13 @@ extern lmc_functions functions[];
 
 int main (int argc, char* argv[]) {
 
-    lmc_state state = {
-        .mem = {9000},
-        .program_counter = 0,
-        .accumulator = 0
-    };
-
     if (argc < 2) {
         printf("Please provide a filename containing LMC assembly.");
     }
     else {
+
+        // ================================= Load assembly =================================
+
         char* file = file_into_str(argv[1]);
         if (!file) {
             return 1;
@@ -37,11 +34,22 @@ int main (int argc, char* argv[]) {
             return 1;
         }
 
+        // ==================================== LMC vars =====================================
+
+        lmc_state state = {
+            .mem = {9000},
+            .program_counter = 0,
+            .accumulator = 0
+        };
+
         Instruction* instructions = malloc(count * sizeof(Instruction));
 
         if (!instructions) {
             return 1;
         }
+
+        // ================================ Load into memory =================================
+
         printf("\n========= LOADING =========");
         for (size_t x = 0; x < count; x++) {
             instructions[x] = parse_input(file_lines[x]);
@@ -49,24 +57,26 @@ int main (int argc, char* argv[]) {
             printf("\nstored %i in address %i", state.mem[x], x);
         }
         printf("\n====== LOADED, BEGIN ======\n");
+
+        // ================================= LMC execution  =================================
+
         do {
             int current_mem_cell = state.mem[state.program_counter];
             Opcode inst = 0;
             if (current_mem_cell > 999) {
                 inst = first_number(current_mem_cell);
             }
-
-            if (inst == HLT) {
-                printf("\n======== HLT AT %zu ========\n", state.program_counter);
-                break;
-            }
             
             int val = current_mem_cell - (inst * 1000);
             (*functions[inst])(&state, val);
+
+            if (inst == HLT) {
+                break;
+            }
             state.program_counter++;
         } while(state.program_counter != LMC_MEMORY_SIZE - 1);
 
-        
+
         // ===================================== CLEANUP =====================================
         for (size_t x = 0; x < count; x++) {
             free(file_lines[x]);

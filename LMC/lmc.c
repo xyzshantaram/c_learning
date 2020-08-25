@@ -65,15 +65,7 @@ void inp(lmc_state* state, byte address) {
 }
 
 void out(lmc_state* state, byte address) {
-    printf("OUT: %i", state->accumulator);
-}
-
-byte next_instruction(lmc_state* state) {
-    
-}
-
-void exec_cell(lmc_state* state) {
-    
+    printf("\nOUT: %i", state->accumulator);
 }
 
 lmc_functions functions[] = {

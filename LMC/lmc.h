@@ -5,7 +5,7 @@
 #pragma once
 
 typedef struct mstate {
-    unsigned int mem[100];
+    unsigned int mem[LMC_MEMORY_SIZE];
     unsigned int program_counter;
     unsigned int accumulator;
 } lmc_state;

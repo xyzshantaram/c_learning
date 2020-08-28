@@ -2,6 +2,7 @@
 #include <stdbool.h>
 
 #define LMC_MEMORY_SIZE 100
+#define DEBUG true
 #pragma once
 
 typedef struct mstate {

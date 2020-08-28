@@ -24,6 +24,8 @@ Instruction parse_input(char* str) {
             i.op = pos;
             i.val = atoi(instr[1]);
         }
+        free(instr[0]);
+        free(instr[1]);
         free (instr);
     }
     return i;
@@ -32,22 +34,24 @@ Instruction parse_input(char* str) {
 void add(lmc_state* state, byte address) {
     byte address_bounded = address % LMC_MEMORY_SIZE;
     if (state->is_neg) {
-        if ((state->accumulator*-1) + state->mem[address_bounded] >= 0) {
+        if ((state->accumulator *- 1) + state->mem[address_bounded] >= 0) {
             state->is_neg = false;
         }
     }
     state->accumulator += state->mem[address_bounded];
+    if (DEBUG) printf("\nAccumulator set to: %u", state->accumulator);
 }
 
 void sub(lmc_state* state, byte address) {
     byte address_bounded = address % LMC_MEMORY_SIZE;
     state->accumulator -= state->mem[address_bounded];
     if (state->accumulator < 0) {
+        if (DEBUG) printf("\nAccumulator %zu is -ve. Flipping: ", state->accumulator, state->accumulator*-1);
         state->accumulator *= -1;
         state->is_neg = true;
     }
+    if (DEBUG) printf("\nAccumulator set to: %u", state->accumulator);
 }
-
 void sta(lmc_state* state, byte address) {
     byte address_bounded = address % LMC_MEMORY_SIZE;
     state->mem[address_bounded] = state->accumulator;
@@ -56,21 +60,22 @@ void sta(lmc_state* state, byte address) {
 void lda(lmc_state* state, byte address) {
     byte address_bounded = address % LMC_MEMORY_SIZE;
     state->accumulator = state->mem[address_bounded];
+    if (DEBUG) printf("\nAccumulator set to: %u", state->accumulator);
 }
 
 void bra(lmc_state* state, byte address) {
     byte address_bounded = address % LMC_MEMORY_SIZE;
-    state->program_counter = state->mem[address_bounded];
+    state->program_counter = address_bounded;
 }
 
 void brz(lmc_state* state, byte address) {
     byte address_bounded = address % LMC_MEMORY_SIZE;
-    if (state->accumulator == 0) state->program_counter = state->mem[address_bounded];
+    if (state->accumulator == 0) state->program_counter = address_bounded;
 }
 
 void brp(lmc_state* state, byte address) {
     byte address_bounded = address % LMC_MEMORY_SIZE;
-    if (!state->is_neg) state->program_counter = state->mem[address_bounded];
+    if (!state->is_neg) state->program_counter = address_bounded;
 }
 
 void inp(lmc_state* state, byte address) {
@@ -78,7 +83,8 @@ void inp(lmc_state* state, byte address) {
     char* str = read_string('\n');
     state->accumulator = atoi(str);
     state->is_neg = false;
-    printf("Accumulator set to: %i", state->accumulator);
+    if (DEBUG) printf("\nAccumulator set to: %u", state->accumulator);
+    free(str);
 }
 
 void out(lmc_state* state, byte address) {

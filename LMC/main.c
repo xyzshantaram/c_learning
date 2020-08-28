@@ -10,6 +10,7 @@
 unsigned int first_number(unsigned int num);
 
 extern lmc_functions functions[];
+extern const char* opcodes[];
 
 int main (int argc, char* argv[]) {
 
@@ -37,7 +38,7 @@ int main (int argc, char* argv[]) {
         // ==================================== LMC vars =====================================
 
         lmc_state state = {
-            .mem = {9000},
+            .mem = {0},
             .program_counter = 0,
             .accumulator = 0,
             .is_neg = false
@@ -67,16 +68,15 @@ int main (int argc, char* argv[]) {
         do {
             int current_mem_cell = state.mem[state.program_counter];
             Opcode inst = instructions[state.program_counter].op;
-
             if (inst <= OUT) {
                 int val = current_mem_cell - (inst * 1000);
                 (*functions[inst])(&state, val);
+                if (DEBUG) printf("\n executed instruction %s %i, program counter at %i", opcodes[inst], val, state.program_counter);
             }
             else {
             }
-
+            if (/* inst != BRZ &&  */inst != BRP && inst != BRA) state.program_counter ++;
             if (inst == HLT) break;
-            if (!(inst == BRA || inst == BRZ || inst == BRP)) state.program_counter++;
 
         } while(state.program_counter != LMC_MEMORY_SIZE - 1);
 

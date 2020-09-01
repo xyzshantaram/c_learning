@@ -7,6 +7,8 @@
 #include "string_utils.h"
 #include "lmc.h"
 
+#define DEBUG_EXEC true
+
 unsigned int first_number(unsigned int num);
 
 extern lmc_functions functions[];
@@ -71,7 +73,6 @@ int main (int argc, char* argv[]) {
             if (inst <= OUT) {
                 int val = current_mem_cell - (inst * 1000);
                 (*functions[inst])(&state, val);
-                if (DEBUG) printf("\n executed instruction %s %i, program counter at %i", opcodes[inst], val, state.program_counter);
             }
             else {
             }

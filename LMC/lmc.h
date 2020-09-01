@@ -8,7 +8,7 @@
 typedef struct mstate {
     unsigned int mem[LMC_MEMORY_SIZE];
     unsigned int program_counter;
-    unsigned int accumulator;
+    int accumulator;
     bool is_neg;
 } lmc_state;
 

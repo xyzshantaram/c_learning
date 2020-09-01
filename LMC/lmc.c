@@ -38,29 +38,50 @@ void add(lmc_state* state, byte address) {
             state->is_neg = false;
         }
     }
+
+    if (DEBUG) {
+        printf("\nADD acc %i and *%i %i sum: %i", state->accumulator, address_bounded, state->mem[address_bounded], state->accumulator + state->mem[address_bounded]);
+    }
     state->accumulator += state->mem[address_bounded];
-    if (DEBUG) printf("\nAccumulator set to: %u", state->accumulator);
 }
 
 void sub(lmc_state* state, byte address) {
     byte address_bounded = address % LMC_MEMORY_SIZE;
-    state->accumulator -= state->mem[address_bounded];
+
+    if (DEBUG) printf("\nSUB acc %i and *%i %i", state->accumulator, address_bounded, state->mem[address_bounded]);
+    if (!state->is_neg) {
+        state->accumulator -= state->mem[address_bounded];
+    }
+    else {
+        state->accumulator += state->mem[address_bounded];
+    }
     if (state->accumulator < 0) {
-        if (DEBUG) printf("\nAccumulator %zu is -ve. Flipping: ", state->accumulator, state->accumulator*-1);
         state->accumulator *= -1;
         state->is_neg = true;
+        if (DEBUG) printf("\nacc %i < 0. flip -> %i, NEG: %s", state->accumulator*-1, state->accumulator, (state->is_neg ? "true" : "false"));
     }
-    if (DEBUG) printf("\nAccumulator set to: %u", state->accumulator);
 }
 void sta(lmc_state* state, byte address) {
     byte address_bounded = address % LMC_MEMORY_SIZE;
+    if (state->accumulator < 0) {
+        state->accumulator *= -1;
+        state->is_neg = true;
+        if (DEBUG) printf("\nacc %i < 0. flip -> %i, NEG: %s", state->accumulator, state->accumulator*-1, (state->is_neg ? "true" : "false"));
+    }
+    if (DEBUG) printf("\nSTA %i from acc into %i", state->accumulator, address_bounded);
     state->mem[address_bounded] = state->accumulator;
 }
 
 void lda(lmc_state* state, byte address) {
     byte address_bounded = address % LMC_MEMORY_SIZE;
+    if(DEBUG) printf("\nLDA %i into acc from %i", state->mem[address_bounded], address_bounded);
     state->accumulator = state->mem[address_bounded];
-    if (DEBUG) printf("\nAccumulator set to: %u", state->accumulator);
+    state->is_neg = false;
+    if (state->accumulator < 0) {
+        if (DEBUG) printf("\nacc %i < 0. flip -> %i, NEG: %s", state->accumulator, state->accumulator*-1, (state->is_neg ? "true" : "false"));
+        state->accumulator *= -1;
+        state->is_neg = true;
+    }
 }
 
 void bra(lmc_state* state, byte address) {
@@ -83,7 +104,11 @@ void inp(lmc_state* state, byte address) {
     char* str = read_string('\n');
     state->accumulator = atoi(str);
     state->is_neg = false;
-    if (DEBUG) printf("\nAccumulator set to: %u", state->accumulator);
+    if (state->accumulator < 0) {
+        if (DEBUG) printf("\nacc %i < 0. flip -> %i, NEG: %s", state->accumulator, state->accumulator*-1, (state->is_neg ? "true" : "false"));
+        state->accumulator *= -1;
+        state->is_neg = true;
+    }
     free(str);
 }
 

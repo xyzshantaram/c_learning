@@ -3,6 +3,8 @@
 
 #define LMC_MEMORY_SIZE 100
 #define DEBUG true
+#define MEMORY_CELL_SIZE 999
+
 #pragma once
 
 typedef struct mstate {

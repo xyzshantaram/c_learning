@@ -59,7 +59,7 @@ int main (int argc, char* argv[]) {
             instructions[x] = parse_input(file_lines[x]);
             
             if (instructions[x].op == 10) state.mem[x] = instructions[x].val;
-            else state.mem[x] = (instructions[x].op * 1000) + instructions[x].val;
+            else state.mem[x] = (instructions[x].op * 100) + instructions[x].val;
 
             printf("\nstored %i in address %i", state.mem[x], x);
         }
@@ -71,7 +71,7 @@ int main (int argc, char* argv[]) {
             int current_mem_cell = state.mem[state.program_counter];
             Opcode inst = instructions[state.program_counter].op;
             if (inst <= OUT) {
-                int val = current_mem_cell - (inst * 1000);
+                int val = current_mem_cell - (inst * 100);
                 (*functions[inst])(&state, val);
             }
             else {

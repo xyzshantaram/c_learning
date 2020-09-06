@@ -29,7 +29,7 @@ let opcodes = ["HLT", "ADD", "SUB", "STA", "LDA", "BRA", "BRZ", "BRP", "INP", "O
 let file = fs.readFileSync(args[0]);
 file = file.toString().replaceAll(/\/\/(.*)/, ' '); // strip comments
 file = file.replaceAll(/  +/g, ' '); // strip extra whitespace
-file = file.replaceAll("\n ", '\n');
+file = file.replaceAll("\n ", '\n'); // strip whitespace at the starting of a line
 let file_lines = file.split('\n');
 
 let line_no = 0;
@@ -37,11 +37,17 @@ let new_lines = [];
 
 for (let raw_line of file_lines) {
     let x = raw_line.trim();
-    if (x === "" || x[0] === "/") {
+    if (x === "" || x.startsWith("//")) {
         continue;
     }
+    
     let tokens = x.split(' ');
 
+    if (tokens.length > 3) {
+        console.error("");
+        process.exit(1);
+    }
+    
     for (let y of tokens) {
         y = y.trim();
         if (y === "") {

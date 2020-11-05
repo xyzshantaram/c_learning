@@ -45,9 +45,9 @@ void sub(lmc_state* state, byte address) {
     byte address_bounded = address/*  % LMC_MEMORY_SIZE */;
     if (DEBUG) printf("\nSUB acc %i and *%i %i", state->accumulator, address_bounded, state->mem[address_bounded]);
     state->accumulator -= state->mem[address_bounded];
+
     state->is_neg = state->accumulator < 0;
-	if (state->is_neg)
-		state->accumulator += LMC_MEMORY_SIZE + 1;
+	if (state->is_neg) state->accumulator += MEMORY_CELL_SIZE + 1;
 }
 void sta(lmc_state* state, byte address) {
     byte address_bounded = address/*  % LMC_MEMORY_SIZE */;

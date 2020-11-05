@@ -70,11 +70,14 @@ int main (int argc, char* argv[]) {
         do {
             int current_mem_cell = state.mem[state.program_counter];
             Opcode inst = instructions[state.program_counter].op;
+            printf("\nPC %i, acc %i", state.program_counter + 1, state.accumulator);
             if (inst <= OUT) {
                 int val = current_mem_cell - (inst * 100);
                 (*functions[inst])(&state, val);
             }
             else {
+                printf("error: invalid opcode");
+                return 1;
             }
             if (/* inst != BRZ &&  */inst != BRP && inst != BRA) state.program_counter ++;
             if (inst == HLT) break;

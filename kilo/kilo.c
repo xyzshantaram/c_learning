@@ -50,7 +50,7 @@ char editor_read_key() {
 }
 
 void editor_process_keypress() {
-    char c = editorReadKey();
+    char c = editor_read_key();
     switch (c) {
     case CTRL_KEY('q'):
         exit(0);
@@ -61,7 +61,7 @@ void editor_process_keypress() {
 int main() {
     enable_raw_mode();
     while (1) {
-        editorProcessKeypress();
+        editor_process_keypress();
     }
     disable_raw_mode();
     return 0;

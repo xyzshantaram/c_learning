@@ -1,5 +1,3 @@
-#include <unistd.h>
-#include <termios.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdio.h>
@@ -16,7 +14,7 @@ int main() {
     init_editor(&state);
     while (1) {
         editor_refresh_screen(&state);
-        editor_process_keypress();
+        editor_process_keypress(&state);
     }
     disable_raw_mode(&state);
     return 0;

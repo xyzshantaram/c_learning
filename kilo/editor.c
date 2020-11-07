@@ -57,7 +57,7 @@ int editor_read_key() {
                     case '6': return PAGE_DOWN;
                     case '1': return HOME;
                     case '4': return END;
-                    case '7': return END;
+                    case '7': return HOME;
                     case '8': return END;
                 }
         }

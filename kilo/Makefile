@@ -1,6 +1,6 @@
 NAME = kilo
 CC ?= gcc # don't override CC if one is already set, or if the user has already set one
-CFLAGS := -Wall -Wextra -Wunreachable-code
+CFLAGS := -Wall -Wextra -Wunreachable-code --std=c99
 OBJ = kilo.o termutils.o editor.o
 HEADER = editor.h termutils.h
 OUTPUT_NAME = kilo
@@ -20,6 +20,9 @@ string_utils.c: $(HEADERS)
 run: $(NAME)
 	./$(OUTPUT_NAME)
 
+test: $(NAME)
+	./$(OUTPUT_NAME) file.txt
+
 clean: 
-	rm $(OBJ)
-	rm $(OUTPUT_NAME)
+	rm -f $(OBJ)
+	rm -f $(OUTPUT_NAME)

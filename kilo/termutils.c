@@ -34,12 +34,12 @@ int get_cursor_pos(size_t *rows, size_t *cols) {
 
 void disable_raw_mode(struct editor_state *state) {
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &(state->orig_termios)) == -1)
-        die("tcsetattr");
+        die("tcsetattr", state);
 }
 
 void enable_raw_mode(struct editor_state *state) {
     if (tcgetattr(STDIN_FILENO, &(state->orig_termios)) == -1)
-        die("tcgetattr");
+        die("tcgetattr", state);
     struct termios raw = state->orig_termios;
     raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
     raw.c_oflag &= ~(OPOST);
@@ -48,19 +48,21 @@ void enable_raw_mode(struct editor_state *state) {
     raw.c_cc[VMIN] = 0;
     raw.c_cc[VTIME] = 1;
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1)
-        die("tcsetattr");
+        die("tcsetattr", state);
 }
 
-void die(const char *msg) {
+void die(const char *msg, struct editor_state *state) {
     write(STDOUT_FILENO, "\x1b[2J", 4);
     write(STDOUT_FILENO, "\x1b[H", 3);
     perror(msg);
+    disable_raw_mode(state);
     exit(1);
 }
 
-void clean_exit(const char *msg) {
+void clean_exit(const char *msg, struct editor_state *state) {
     write(STDOUT_FILENO, "\x1b[2J", 4);
     write(STDOUT_FILENO, "\x1b[H", 3);
+    disable_raw_mode(state);
     printf(msg);
     exit(0);
 }

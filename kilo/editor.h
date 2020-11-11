@@ -15,7 +15,7 @@
     #include "termutils.h"
 #endif
 
-#define KILO_VERSION "ch 4"
+#define KILO_VERSION "ch 6"
 #define TAB_SIZE 4
 #define STATUSLINE_COUNT 2
 #define STATUS_TIMEOUT 2
@@ -69,12 +69,13 @@
     char *editor_rows_to_string(struct editor_state *state, int *buf_len);
     void editor_row_append_string(struct editor_state *state, e_row *row, char *s, size_t len);
     void editor_delete_row(struct editor_state *state, size_t at);
-    char *e_get_prompt_response(struct editor_state *state);
+    char *e_get_prompt_response(struct editor_state *state, const char *prompt, void (*callback)(struct editor_state *, char *, int));
     void editor_delete_char(struct editor_state *state);
-    char *e_get_prompt_response(struct editor_state *state);
     int e_row_cx_to_rx(e_row *row, int cx);
     void editor_insert_char(struct editor_state *state, int c);
     void editor_insert_newline(struct editor_state *state);
+    void editor_find_callback(struct editor_state *state, char *query, int key);
+    void editor_find(struct editor_state *state);
 #endif
 
 #ifndef KEY_ENUM

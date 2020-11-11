@@ -46,8 +46,7 @@ void editor_open_file(struct editor_state *state, const char *filename) {
 
 void editor_save_file(struct editor_state *state) {
     if (state->filename == NULL) {
-        editor_set_status(state, "Enter filename to save to:");
-        state->filename = e_get_prompt_response(state);
+        state->filename = e_get_prompt_response(state, "Enter filename: %s", NULL);
         if (state->filename == NULL) {
             editor_set_status(state, "Save cancelled by user.");
             return;
@@ -254,7 +253,7 @@ void editor_process_keypress(struct editor_state *state) {
     case CTRL_KEY('q'):
         if (state->dirty) {
             editor_set_status(state, "WARNING: File has unsaved changes. "
-                                     "Press y to confirm exit / s to save and exit.");
+                                     "y to confirm exit / s to save and exit");
             editor_refresh_screen(state);
             int j = editor_read_key(state);
             if (j == 'y') {
@@ -275,9 +274,8 @@ void editor_process_keypress(struct editor_state *state) {
     case CTRL_KEY('s'):
         editor_save_file(state);
     break;
-    case 33:
-        editor_save_file(state);
-        clean_exit("Exit called by user.\r\n", state);
+    case CTRL_KEY('f'):
+        editor_find(state);
     break;
     case ARROW_UP:
     case ARROW_DOWN:
@@ -421,6 +419,19 @@ int e_row_cx_to_rx(e_row *row, int cx) {
     return rx;
 }
 
+int e_row_rx_to_cx(e_row *row, int rx) {
+  int cur_rx = 0;
+  size_t cx;
+  for (cx = 0; cx < row->size; cx++) {
+    if (row->chars[cx] == '\t')
+      cur_rx += (TAB_SIZE - 1) - (cur_rx % TAB_SIZE);
+    cur_rx++;
+    if (cur_rx > rx) return cx;
+  }
+  return cx;
+}
+
+
 void e_row_insert_char(struct editor_state *state, e_row *row, size_t at, int c) {
     if (at > row->size)
         at = row->size;
@@ -504,14 +515,14 @@ void editor_insert_newline(struct editor_state *state) {
   state->cx = 0;
 }
 
-char *e_get_prompt_response(struct editor_state *state) {
+char *e_get_prompt_response(struct editor_state *state, const char* prompt, void (*callback)(struct editor_state *, char *, int)) {
     size_t buf_size = 128;
     size_t buf_len = 0;
-    char *buf = malloc(128 + 1);
+    char *buf = calloc(128 + 1, sizeof(char));
     if (buf) {
         int c;
         while (1) {
-            editor_set_status(state, "%s", buf);
+            editor_set_status(state, prompt, buf);
             editor_refresh_screen(state);
             c = editor_read_key(state);
 
@@ -520,24 +531,27 @@ char *e_get_prompt_response(struct editor_state *state) {
             } 
             else if (c == '\x1b') {
                 editor_set_status(state, "");
+                if (callback) callback(state, buf, c);
                 free(buf);
                 return NULL;
             }
             else if (c == '\r') {
                     if (buf_len != 0) {
                         editor_set_status(state, "");
+                        if (callback) callback(state, buf, c);
                         return buf;
                     }
                 }
-                else if (!iscntrl(c) && c < 128) {
-                    if (buf_len == buf_size - 1) {
-                        buf_size *= 2;
-                        buf = realloc(buf, buf_size);
-                    }
-                    buf[buf_len++] = c;
-                    buf[buf_len] = '\0';
+            else if (!iscntrl(c) && c < 128) {
+                if (buf_len == buf_size - 1) {
+                    buf_size *= 2;
+                    buf = realloc(buf, buf_size);
                 }
+                buf[buf_len++] = c;
+                buf[buf_len] = '\0';
             }
+            if (callback) callback(state, buf, c);
+        }
         buf[buf_len] = '\0';
         editor_set_status(state, "input: %s", buf);
         editor_refresh_screen(state);
@@ -545,5 +559,59 @@ char *e_get_prompt_response(struct editor_state *state) {
     }
     else {
         return NULL;
+    }
+}
+
+void editor_find(struct editor_state *state) {
+    size_t saved_cx = state->cx;
+    size_t saved_cy = state->cy;
+    size_t saved_coloff = state->column_offset;
+    size_t saved_row_offset = state->row_offset;
+    char *query = e_get_prompt_response(state, "Search: %s (ESC to cancel)", editor_find_callback);
+    if (query) {
+        free(query);
+    }
+    else {
+        state->cx = saved_cx;
+        state->cy = saved_cy;
+        state->column_offset = saved_coloff;
+        state->row_offset = saved_row_offset;
+    }
+}
+
+
+void editor_find_callback(struct editor_state *state, char *query, int key) {
+    static int last_match = -1;
+    static int direction = 1;
+    if (key == '\r' || key == '\x1b') {
+        last_match = -1;
+        direction = 1;
+        return;
+    } else if (key == ARROW_RIGHT || key == ARROW_DOWN) {
+        direction = 1;
+    } else if (key == ARROW_LEFT || key == ARROW_UP) {
+        direction = -1;
+    } else {
+        last_match = -1;
+        direction = 1;
+    }
+    if (last_match == -1)
+        direction = 1;
+    int current = last_match;
+
+    for (size_t i = 0; i < state->n_rows; i++) {
+        current += direction;
+        if (current == -1) current = state->n_rows - 1;
+        else if (current == (int) state->n_rows) current = 0;
+        
+        e_row *row = &state->row[current];
+        char *match = strstr(row->render, query);
+        if (match) {
+            last_match = current;
+            state->cy = current;
+            state->cx = e_row_rx_to_cx(row, match - row->render);
+            state->row_offset = state->n_rows;
+            break;
+        }
     }
 }

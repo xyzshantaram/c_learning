@@ -1,2 +1,2 @@
-test line of text in file.txt
-here's another test line
+test
+test

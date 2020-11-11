@@ -1,4 +1,6 @@
+#include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -16,19 +18,17 @@
 #define KILO_VERSION "ch 4"
 #define TAB_SIZE 4
 #define STATUSLINE_COUNT 2
-
-#define _DEFAULT_SOURCE
-#define _BSD_SOURCE
-#define _GNU_SOURCE
+#define STATUS_TIMEOUT 2
+#define QUIT_CONFIRM_COUNT 3
 
 #define CTRL_KEY(k) ((k)&0x1f)
 
 #ifndef E_ROW
     #define E_ROW
     typedef struct e_row {
-        int size;
+        size_t size;
         char *chars;
-        int render_size;
+        size_t render_size;
         char* render;
     } e_row;
 #endif
@@ -49,6 +49,8 @@
         char *filename;
         char status_msg[80];
         time_t status_time;
+        int dirty;
+        int last_key;
     };
 #endif
 
@@ -58,12 +60,21 @@
     void editor_refresh_screen(struct editor_state *state);
     void init_editor(struct editor_state *state);
     void editor_move_cursor(struct editor_state *state, int key);
-    int editor_read_key();
-    void editor_process_keypress();
+    int editor_read_key(struct editor_state *state);
+    void editor_process_keypress(struct editor_state *state);
     void editor_open_file(struct editor_state *state, const char *filename);
-    void editor_append_row(struct editor_state *state, char *s, size_t len);
+    void editor_insert_row(struct editor_state *state, char *s, size_t len, size_t at);
     void editor_update_row(e_row *row);
     void editor_set_status(struct editor_state *state, const char *fmt, ...);
+    char *editor_rows_to_string(struct editor_state *state, int *buf_len);
+    void editor_row_append_string(struct editor_state *state, e_row *row, char *s, size_t len);
+    void editor_delete_row(struct editor_state *state, size_t at);
+    char *e_get_prompt_response(struct editor_state *state);
+    void editor_delete_char(struct editor_state *state);
+    char *e_get_prompt_response(struct editor_state *state);
+    int e_row_cx_to_rx(e_row *row, int cx);
+    void editor_insert_char(struct editor_state *state, int c);
+    void editor_insert_newline(struct editor_state *state);
 #endif
 
 #ifndef KEY_ENUM
@@ -77,6 +88,7 @@
             PAGE_DOWN,
             HOME,
             END,
-            DEL
+            DEL,
+            BACKSPACE = 127,
         };
 #endif

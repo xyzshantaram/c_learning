@@ -10,18 +10,14 @@ char *C_HL_keywords[] = {
     "switch", "if", "while", "for", "break", "continue", "return", "else",
     "struct", "union", "typedef", "static", "enum", "class", "case",
     "int|", "long|", "double|", "float|", "char|", "unsigned|", "signed|",
-    "void|", NULL
-};
+    "void|", NULL};
 
 struct editor_syntax HLDB[] = {
-    {
-        "c",
-        C_HL_extensions,
-        C_HL_keywords,
-        "//",  "/*", "*/",
-        HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STRINGS
-     }
-};
+    {"c",
+     C_HL_extensions,
+     C_HL_keywords,
+     "//", "/*", "*/",
+     HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STRINGS}};
 
 void init_editor(struct editor_state *state) {
     if (state->filename) {
@@ -132,7 +128,7 @@ void editor_insert_row(struct editor_state *state, char *s, size_t len, size_t a
     for (int j = at + 1; j <= state->n_rows; j++) state->row[j].idx++;
 
     state->row[at].size = len;
-    state->row[at].chars = malloc(len + 1);
+    state->row[at].chars = calloc(len + 1, 1);
     memcpy(state->row[at].chars, s, len);
     state->row[at].chars[len] = '\0';
     state->row[at].render_size = 0;
@@ -706,117 +702,6 @@ void editor_find_callback(struct editor_state *state, char *query, int key) {
     }
 }
 
-void editor_update_syntax(struct editor_state *state, e_row *row) {
-    row->hl = realloc(row->hl, row->render_size);
-    memset(row->hl, HL_NORMAL, row->render_size);
-    if (state->syntax == NULL) return;
-
-    char *scs = state->syntax->singleline_comment_start;
-    char *mcs = state->syntax->multiline_comment_start;
-    char *mce = state->syntax->multiline_comment_end;
-
-    int scs_len = scs ? strlen(scs) : 0;
-    int mcs_len = mcs ? strlen(mcs) : 0;
-    int mce_len = mce ? strlen(mce) : 0;
-    char **keywords = state->syntax->keywords;
-
-    int prev_sep = 1;
-    int in_string = 0;
-    int in_comment = (row->idx > 0 && state->row[row->idx - 1].hl_open_comment);
-
-    int i = 0;
-    while (i < row->render_size) {
-        char c = row->render[i];
-        unsigned char prev_hl = (i > 0) ? row->hl[i - 1] : HL_NORMAL;
-
-        if (scs_len && !in_string && !in_comment) {
-            if (!strncmp(&row->render[i], scs, scs_len)) {
-                memset(&row->hl[i], HL_COMMENT, row->render_size - i);
-                break;
-            }
-        }
-        if (mcs_len && mce_len && !in_string) {
-            if (in_comment) {
-                row->hl[i] = HL_MLCOMMENT;
-                if (!strncmp(&row->render[i], mce, mce_len)) {
-                    memset(&row->hl[i], HL_MLCOMMENT, mce_len);
-                    i += mce_len;
-                    in_comment = 0;
-                    prev_sep = 1;
-                    continue;
-                }
-                else {
-                    i++;
-                    continue;
-                }
-            }
-            else if (!strncmp(&row->render[i], mcs, mcs_len)) {
-                memset(&row->hl[i], HL_MLCOMMENT, mcs_len);
-                i += mcs_len;
-                in_comment = 1;
-                continue;
-            }
-        }
-
-        if (state->syntax->flags & HL_HIGHLIGHT_STRINGS) {
-            if (in_string) {
-                row->hl[i] = HL_STRING;
-                if (c == '\\' && i + 1 < row->render_size) {
-                    row->hl[i + 1] = HL_STRING;
-                    i += 2;
-                    continue;
-                }
-                if (c == in_string) in_string = 0;
-                i++;
-                prev_sep = 1;
-                continue;
-            }
-            else {
-                if (c == '"' || c == '\'') {
-                in_string = c;
-                row->hl[i] = HL_STRING;
-                i++;
-                continue;
-                }
-            }
-        }
-
-        if (state->syntax->flags & HL_HIGHLIGHT_NUMBERS) {
-            if ((isdigit(c) && (prev_sep || prev_hl == HL_NUMBER)) || (c == '.' && prev_hl == HL_NUMBER)) {
-                row->hl[i] = HL_NUMBER;
-                i++;
-                prev_sep = 0;
-                continue;
-            }
-        }
-
-        if (prev_sep) {
-            size_t j;
-            for (j = 0; keywords[j]; j++) {
-                int klen = strlen(keywords[j]);
-                int kw2 = keywords[j][klen - 1] == '|';
-                if (kw2) klen--;
-                if (!strncmp(&row->render[i], keywords[j], klen) &&
-                    is_separator(row->render[i + klen])) {
-                    memset(&row->hl[i], kw2 ? HL_KEYWORD2 : HL_KEYWORD1, klen);
-                    i += klen;
-                    break;
-                }
-            }
-            if (keywords[j] != NULL) {
-                prev_sep = 0;
-                continue;
-            }
-        }
-
-        prev_sep = is_separator(c);
-        i++;
-    }
-    int changed = (row->hl_open_comment != in_comment);
-    row->hl_open_comment = in_comment;
-    if (changed && row->idx + 1 < state->n_rows) editor_update_syntax(state, &state->row[row->idx + 1]);
-}
-
 int is_separator(int c) {
     return isspace(c) || c == '\0' || strchr(",.()+-/*=~%<>[];", c) != NULL;
 }
@@ -835,8 +720,7 @@ int editor_syntax_to_color(int hl) {
   }
 }
 
-void editor_select_highlight(struct editor_state *state)
-{
+void editor_select_highlight(struct editor_state *state) {
     state->syntax = NULL;
     if (state->filename == NULL)
         return;

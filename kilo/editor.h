@@ -31,7 +31,7 @@
     #include "termutils.h"
 #endif
 
-#define KILO_VERSION "ch 6"
+#define KILO_VERSION "ch 7"
 #define TAB_SIZE 4
 #define STATUSLINE_COUNT 2
 #define STATUS_TIMEOUT 2

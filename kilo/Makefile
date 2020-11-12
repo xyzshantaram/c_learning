@@ -1,6 +1,6 @@
 NAME = kilo
 CC ?= gcc # don't override CC if one is already set, or if the user has already set one
-CFLAGS := -Wall -Wextra -Wunreachable-code
+CFLAGS := -Wall -Wextra -Wunreachable-code -O0
 OBJ = kilo.o termutils.o editor.o
 HEADER = editor.h termutils.h
 OUTPUT_NAME = kilo

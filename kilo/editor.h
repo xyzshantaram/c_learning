@@ -10,6 +10,22 @@
 #include <termios.h>
 #include <unistd.h>
 
+#ifndef ESYNTAX
+    #define ESYNTAX
+    #define HL_HIGHLIGHT_NUMBERS (1 << 0)
+    #define HL_HIGHLIGHT_STRINGS (1 << 1)
+    struct editor_syntax {
+        char *filetype;
+        char **filematch;
+        char **keywords;
+        char *singleline_comment_start;
+        char *multiline_comment_start;
+        char *multiline_comment_end;
+        int flags;
+    };
+    #define HLDB_ENTRIES (sizeof(HLDB) / sizeof(HLDB[0]))
+#endif
+
 #ifndef TUTILS_INCL
     #define TUTILS_INCL
     #include "termutils.h"
@@ -26,11 +42,29 @@
 #ifndef E_ROW
     #define E_ROW
     typedef struct e_row {
+        int idx;
         size_t size;
         char *chars;
         size_t render_size;
         char* render;
+        unsigned char* hl;
+        int hl_open_comment;
     } e_row;
+#endif
+
+#ifndef HL
+    #define HL
+    enum editor_highlights
+    {
+        HL_NORMAL = 0,
+        HL_NUMBER,
+        HL_MATCH,
+        HL_STRING,
+        HL_COMMENT,
+        HL_KEYWORD1,
+        HL_KEYWORD2,
+        HL_MLCOMMENT,
+    };
 #endif
 
 #ifndef ESTATE
@@ -51,6 +85,7 @@
         time_t status_time;
         int dirty;
         int last_key;
+        struct editor_syntax *syntax;
     };
 #endif
 
@@ -64,7 +99,7 @@
     void editor_process_keypress(struct editor_state *state);
     void editor_open_file(struct editor_state *state, const char *filename);
     void editor_insert_row(struct editor_state *state, char *s, size_t len, size_t at);
-    void editor_update_row(e_row *row);
+    void editor_update_row(struct editor_state *state, e_row *row);
     void editor_set_status(struct editor_state *state, const char *fmt, ...);
     char *editor_rows_to_string(struct editor_state *state, int *buf_len);
     void editor_row_append_string(struct editor_state *state, e_row *row, char *s, size_t len);
@@ -76,6 +111,8 @@
     void editor_insert_newline(struct editor_state *state);
     void editor_find_callback(struct editor_state *state, char *query, int key);
     void editor_find(struct editor_state *state);
+    void editor_update_syntax(struct editor_state *state, e_row *row);
+    int is_separator(int c);
 #endif
 
 #ifndef KEY_ENUM
@@ -92,4 +129,11 @@
             DEL,
             BACKSPACE = 127,
         };
+#endif
+
+#ifndef HL_COLORS
+    #define HL_COLORS
+/*     enum highlight_colors {
+
+    }; */
 #endif

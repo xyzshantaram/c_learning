@@ -1,6 +1,28 @@
 #include "editor.h"
 #include "termutils.h"
 
+/*
+multiline comment zomg
+*/
+
+char *C_HL_extensions[] = {".c", ".h", ".cpp", NULL};
+char *C_HL_keywords[] = {
+    "switch", "if", "while", "for", "break", "continue", "return", "else",
+    "struct", "union", "typedef", "static", "enum", "class", "case",
+    "int|", "long|", "double|", "float|", "char|", "unsigned|", "signed|",
+    "void|", NULL
+};
+
+struct editor_syntax HLDB[] = {
+    {
+        "c",
+        C_HL_extensions,
+        C_HL_keywords,
+        "//",  "/*", "*/",
+        HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STRINGS
+     }
+};
+
 void init_editor(struct editor_state *state) {
     if (state->filename) {
         free(state->filename);
@@ -19,14 +41,16 @@ void init_editor(struct editor_state *state) {
     state->status_msg[0] = '\0';
     state->status_time = 0;
     state->dirty = 0;
+    state->syntax = NULL;
     if (get_window_size(state) == -1) die("get_window_size", state);
-    state->cols += 1;
     state->rows -= STATUSLINE_COUNT;
 }
 
 void editor_open_file(struct editor_state *state, const char *filename) {
     free(state->filename);
     state->filename = strdup(filename);
+    editor_select_highlight(state);
+
     FILE *fp = fopen(filename, "r");
     if (!fp)
         die("fopen", state);
@@ -51,6 +75,7 @@ void editor_save_file(struct editor_state *state) {
             editor_set_status(state, "Save cancelled by user.");
             return;
         }
+        editor_select_highlight(state);
     }
     int len;
     char *buf = editor_rows_to_string(state, &len);
@@ -104,13 +129,18 @@ void editor_insert_row(struct editor_state *state, char *s, size_t len, size_t a
         return;
     state->row = realloc(state->row, sizeof(e_row) * (state->n_rows + 1));
     memmove(&state->row[at + 1], &state->row[at], sizeof(e_row) * (state->n_rows - at));
+    for (int j = at + 1; j <= state->n_rows; j++) state->row[j].idx++;
+
     state->row[at].size = len;
     state->row[at].chars = malloc(len + 1);
     memcpy(state->row[at].chars, s, len);
     state->row[at].chars[len] = '\0';
     state->row[at].render_size = 0;
     state->row[at].render = NULL;
-    editor_update_row(&state->row[at]);
+    state->row[at].hl = NULL;
+    state->row[at].idx = at;
+    state->row[at].hl_open_comment = 0;
+    editor_update_row(state, &state->row[at]);
     state->n_rows++;
     state->dirty++;
 }
@@ -119,12 +149,13 @@ void editor_draw_status(struct editor_state *state, struct abuf *ab) {
     char status[80], rstatus[80];
     size_t len = snprintf(status, sizeof(status), "%.20s - %zu lines %s", state->filename ? state->filename : "[No Name]", state->n_rows,
                           state->dirty ? "(modified)" : "");
-    size_t rlen = snprintf(rstatus, sizeof(rstatus), "cy %zu: cx %zu", state->cy, state->cx);
+    int rlen = snprintf(rstatus, sizeof(rstatus), "%s | %d/%d",
+                        state->syntax ? state->syntax->filetype : "no filetype", state->cy + 1, state->n_rows);
     if (len > state->cols)
         len = state->cols;
     ab_append(ab, status, len);
-    while (len < state->cols - 1) {
-        if (state->cols - len - 1 == rlen) {
+    while (len < state->cols) {
+        if (state->cols - len == rlen) {
             ab_append(ab, rstatus, rlen);
             break;
         }
@@ -154,12 +185,44 @@ void editor_draw_rows(struct editor_state *state, struct abuf *ab) {
             int len = state->row[file_row].render_size - state->column_offset;
             if (len < 0) len = 0;
             if (len > (int) state->cols) len = state->cols;
-            ab_append(ab, &state->row[file_row].render[state->column_offset], len);
+            //ab_append(ab, &state->row[file_row].render[state->column_offset], len);
+            unsigned char *hl = &state->row[file_row].hl[state->column_offset];
+            char *c = &state->row[file_row].render[state->column_offset];
+            int current_color = -1;
+            for (size_t j = 0; j < len; j++) {
+                if (iscntrl(c[j])) {
+                    char sym = (c[j] <= 26) ? '@' + c[j] : '?';
+                    ab_append(ab, "\x1b[7m", 4);
+                    ab_append(ab, &sym, 1);
+                    ab_append(ab, "\x1b[m", 3);
+                    if (current_color != -1) {
+                        char buf[16];
+                        int clen = snprintf(buf, sizeof(buf), "\x1b[%dm", current_color);
+                        ab_append(ab, buf, clen);
+                    }
+                }
+                else if (hl[j] == HL_NORMAL) {
+                        if (current_color != -1) {
+                            ab_append(ab, "\x1b[39m", 5);
+                            current_color = -1;
+                        }
+                        ab_append(ab, &c[j], 1);
+                    }
+                    else {
+                        int color = editor_syntax_to_color(hl[j]);
+                        if (color != current_color) {
+                            current_color = color;
+                            char buf[16];
+                            int clen = snprintf(buf, sizeof(buf), "\x1b[%dm", color);
+                            ab_append(ab, buf, clen);
+                        }
+                        ab_append(ab, &c[j], 1);
+                    }
+                }
+            ab_append(ab, "\x1b[39m", 5);
         }
         ab_append(ab, "\x1b[K", 4);
-        if (y < state->rows) {
-            ab_append(ab, "\r\n", 2);
-        }
+        ab_append(ab, "\r\n", 2);
     }
 }
 
@@ -253,7 +316,7 @@ void editor_process_keypress(struct editor_state *state) {
     case CTRL_KEY('q'):
         if (state->dirty) {
             editor_set_status(state, "WARNING: File has unsaved changes. "
-                                     "y to confirm exit / s to save and exit");
+                                     "y to confirm / s to save and exit");
             editor_refresh_screen(state);
             int j = editor_read_key(state);
             if (j == 'y') {
@@ -270,6 +333,14 @@ void editor_process_keypress(struct editor_state *state) {
         } else {
             clean_exit("Exit called by user.\r\n", state);
         }
+    break;
+    case CTRL_KEY('c'):
+    case CTRL_KEY('x'):
+    case CTRL_KEY('v'):
+        editor_set_status(state, "Clipboard not implemented yet.");
+    break;
+    case CTRL_KEY('z'):
+        editor_set_status(state, "Undo not implemented yet.");
     break;
     case CTRL_KEY('s'):
         editor_save_file(state);
@@ -341,7 +412,8 @@ void editor_move_cursor(struct editor_state *state, int key) {
         else if (state->cx == 0) {
             if (state->cy > 0) {
                 state->cy--;
-                state->cx = state->row[state->cy].size;
+                state->column_offset--;
+                state->cx = state->row[state->cy].size + 1;
             }
         }
         break;
@@ -365,6 +437,9 @@ void editor_move_cursor(struct editor_state *state, int key) {
     row = (state->cy >= state->n_rows) ? NULL : &state->row[state->cy];
     if (!row) return;
     size_t row_len = row ? row->size : 0;
+    if (row_len < state->cols && state->column_offset != 0) {
+        state->column_offset = 0;
+    }
     if (state->cx > row_len) {
         state->cx = row_len;
     }
@@ -386,7 +461,7 @@ char *editor_rows_to_string(struct editor_state *state, int *buf_len) {
     return buf;
 }
 
-void editor_update_row(e_row *row) {
+void editor_update_row(struct editor_state *state, e_row *row) {
     int tabs = 0;
     for (size_t j = 0; j <= row->size; j++) {
         if (row->chars[j] == '\t') tabs++;
@@ -406,6 +481,7 @@ void editor_update_row(e_row *row) {
     }
     row->render[idx] = '\0';
     row->render_size = idx;
+    editor_update_syntax(state, row);
 }
 
 int e_row_cx_to_rx(e_row *row, int cx) {
@@ -439,7 +515,7 @@ void e_row_insert_char(struct editor_state *state, e_row *row, size_t at, int c)
     memmove(&row->chars[at + 1], &row->chars[at], row->size - at + 1);
     row->size++;
     row->chars[at] = c;
-    editor_update_row(row);
+    editor_update_row(state, row);
     state->dirty++;
 }
 
@@ -456,7 +532,7 @@ void e_row_delete_char(struct editor_state *state, e_row *row, size_t at) {
         return;
     memmove(&row->chars[at], &row->chars[at + 1], row->size - at);
     row->size--;
-    editor_update_row(row);
+    editor_update_row(state, row);
     state->dirty++;
 }
 
@@ -481,12 +557,14 @@ void editor_delete_char(struct editor_state *state) {
 void editor_free_row(e_row *row) {
     free(row->render);
     free(row->chars);
+    free(row->hl);
 }
 void editor_delete_row(struct editor_state *state, size_t at) {
     if (at >= state->n_rows)
         return;
     editor_free_row(&state->row[at]);
     memmove(&state->row[at], &state->row[at + 1], sizeof(e_row) * (state->n_rows - at - 1));
+    for (int j = at; j < state->n_rows - 1; j++) state->row[j].idx--;
     state->n_rows--;
     state->dirty++;
 }
@@ -496,7 +574,7 @@ void editor_row_append_string(struct editor_state *state, e_row *row, char* s, s
     memcpy(&row->chars[row->size], s, len);
     row->size += len;
     row->chars[row->size] = '\0';
-    editor_update_row(row);
+    editor_update_row(state, row);
     state->dirty++;
 }
 
@@ -509,7 +587,7 @@ void editor_insert_newline(struct editor_state *state) {
     row = &state->row[state->cy];
     row->size = state->cx;
     row->chars[row->size] = '\0';
-    editor_update_row(row);
+    editor_update_row(state, row);
   }
   state->cy++;
   state->cx = 0;
@@ -583,6 +661,14 @@ void editor_find(struct editor_state *state) {
 void editor_find_callback(struct editor_state *state, char *query, int key) {
     static int last_match = -1;
     static int direction = 1;
+
+    static int saved_hl_line;
+    static char *saved_hl = NULL;
+    if (saved_hl) {
+        memcpy(state->row[saved_hl_line].hl, saved_hl, state->row[saved_hl_line].render_size);
+        free(saved_hl);
+        saved_hl = NULL;
+    }
     if (key == '\r' || key == '\x1b') {
         last_match = -1;
         direction = 1;
@@ -611,7 +697,165 @@ void editor_find_callback(struct editor_state *state, char *query, int key) {
             state->cy = current;
             state->cx = e_row_rx_to_cx(row, match - row->render);
             state->row_offset = state->n_rows;
+            saved_hl_line = current;
+            saved_hl = malloc(row->render_size);
+            memcpy(saved_hl, row->hl, row->render_size);
+            memset(&row->hl[match - row->render], HL_MATCH, strlen(query));
             break;
+        }
+    }
+}
+
+void editor_update_syntax(struct editor_state *state, e_row *row) {
+    row->hl = realloc(row->hl, row->render_size);
+    memset(row->hl, HL_NORMAL, row->render_size);
+    if (state->syntax == NULL) return;
+
+    char *scs = state->syntax->singleline_comment_start;
+    char *mcs = state->syntax->multiline_comment_start;
+    char *mce = state->syntax->multiline_comment_end;
+
+    int scs_len = scs ? strlen(scs) : 0;
+    int mcs_len = mcs ? strlen(mcs) : 0;
+    int mce_len = mce ? strlen(mce) : 0;
+    char **keywords = state->syntax->keywords;
+
+    int prev_sep = 1;
+    int in_string = 0;
+    int in_comment = (row->idx > 0 && state->row[row->idx - 1].hl_open_comment);
+
+    int i = 0;
+    while (i < row->render_size) {
+        char c = row->render[i];
+        unsigned char prev_hl = (i > 0) ? row->hl[i - 1] : HL_NORMAL;
+
+        if (scs_len && !in_string && !in_comment) {
+            if (!strncmp(&row->render[i], scs, scs_len)) {
+                memset(&row->hl[i], HL_COMMENT, row->render_size - i);
+                break;
+            }
+        }
+        if (mcs_len && mce_len && !in_string) {
+            if (in_comment) {
+                row->hl[i] = HL_MLCOMMENT;
+                if (!strncmp(&row->render[i], mce, mce_len)) {
+                    memset(&row->hl[i], HL_MLCOMMENT, mce_len);
+                    i += mce_len;
+                    in_comment = 0;
+                    prev_sep = 1;
+                    continue;
+                }
+                else {
+                    i++;
+                    continue;
+                }
+            }
+            else if (!strncmp(&row->render[i], mcs, mcs_len)) {
+                memset(&row->hl[i], HL_MLCOMMENT, mcs_len);
+                i += mcs_len;
+                in_comment = 1;
+                continue;
+            }
+        }
+
+        if (state->syntax->flags & HL_HIGHLIGHT_STRINGS) {
+            if (in_string) {
+                row->hl[i] = HL_STRING;
+                if (c == '\\' && i + 1 < row->render_size) {
+                    row->hl[i + 1] = HL_STRING;
+                    i += 2;
+                    continue;
+                }
+                if (c == in_string) in_string = 0;
+                i++;
+                prev_sep = 1;
+                continue;
+            }
+            else {
+                if (c == '"' || c == '\'') {
+                in_string = c;
+                row->hl[i] = HL_STRING;
+                i++;
+                continue;
+                }
+            }
+        }
+
+        if (state->syntax->flags & HL_HIGHLIGHT_NUMBERS) {
+            if ((isdigit(c) && (prev_sep || prev_hl == HL_NUMBER)) || (c == '.' && prev_hl == HL_NUMBER)) {
+                row->hl[i] = HL_NUMBER;
+                i++;
+                prev_sep = 0;
+                continue;
+            }
+        }
+
+        if (prev_sep) {
+            size_t j;
+            for (j = 0; keywords[j]; j++) {
+                int klen = strlen(keywords[j]);
+                int kw2 = keywords[j][klen - 1] == '|';
+                if (kw2) klen--;
+                if (!strncmp(&row->render[i], keywords[j], klen) &&
+                    is_separator(row->render[i + klen])) {
+                    memset(&row->hl[i], kw2 ? HL_KEYWORD2 : HL_KEYWORD1, klen);
+                    i += klen;
+                    break;
+                }
+            }
+            if (keywords[j] != NULL) {
+                prev_sep = 0;
+                continue;
+            }
+        }
+
+        prev_sep = is_separator(c);
+        i++;
+    }
+    int changed = (row->hl_open_comment != in_comment);
+    row->hl_open_comment = in_comment;
+    if (changed && row->idx + 1 < state->n_rows) editor_update_syntax(state, &state->row[row->idx + 1]);
+}
+
+int is_separator(int c) {
+    return isspace(c) || c == '\0' || strchr(",.()+-/*=~%<>[];", c) != NULL;
+}
+
+int editor_syntax_to_color(int hl) {
+  switch (hl) {
+    case HL_NUMBER: return 31;
+    case HL_MATCH: return 34;
+    case HL_STRING: return 35;
+    case HL_KEYWORD1: return 33;
+    case HL_KEYWORD2: return 32;
+    case HL_COMMENT:
+    case HL_MLCOMMENT:
+        return 36;
+    default: return 37;
+  }
+}
+
+void editor_select_highlight(struct editor_state *state)
+{
+    state->syntax = NULL;
+    if (state->filename == NULL)
+        return;
+    char *ext = strrchr(state->filename, '.');
+    for (unsigned int j = 0; j < HLDB_ENTRIES; j++) {
+        struct editor_syntax *s = &HLDB[j];
+        unsigned int i = 0;
+        while (s->filematch[i]) {
+            int is_ext = (s->filematch[i][0] == '.');
+            if ((is_ext && ext && !strcmp(ext, s->filematch[i])) ||
+                (!is_ext && strstr(state->filename, s->filematch[i]))) {
+                state->syntax = s;
+                for (size_t file_row = 0; file_row < state->n_rows; file_row++) {
+                    editor_update_syntax(state, &state->row[file_row]);
+                }
+
+                return;
+            }
+            i++;
         }
     }
 }
